@@ -656,27 +656,26 @@ hystrix:
 
 ```
 부하테스터 siege 툴을 통한 서킷 브레이커 동작 확인:
-- 동시사용자 1명, 10초 동안 실시
+- 동시사용자 1명, 20초 동안 실시
  -> 여기에 이미지
 
-운영시스템은 죽지 않고 지속적으로 CB 에 의하여 적절히 회로가 열림과 닫힘이 벌어지면서 자원을 보호하고 있음을 보여줌. 하지만, 81.82% 가 성공하였고, 18.18%가 실패했다는 것은 고객 사용성에 있어 좋지 않기 때문에 Retry 설정과 동적 Scale out (replica의 자동적 추가,HPA) 을 통하여 시스템을 확장 해주는 후속처리가 필요.
+운영시스템은 죽지 않고 지속적으로 CB 에 의하여 적절히 회로가 열림과 닫힘이 벌어지면서 자원을 보호하고 있음을 보여줌. 하지만, 50%의 비율로 성공과 실패를 반복하여 신뢰성 있는 시스템으로 판단하기 어렵기 때문에 Retry 설정과 동적 Scale out (replica의 자동적 추가,HPA) 을 통하여 시스템을 확장 해주는 후속처리가 필요할 것으로 판단하였다.
 
-Availability 가 높아진 것을 확인 (siege)
 
 
 
 ### 오토스케일 아웃
 앞서 CB 는 시스템을 안정되게 운영할 수 있게 해줬지만 사용자의 요청을 100% 받아들여주지 못했기 때문에 이에 대한 보완책으로 자동화된 확장 기능을 적용하고자 한다. 
 
+- 배송서비스에 대한 replica 를 동적으로 늘려주도록 HPA 를 설정한다. 설정은 CPU 사용량이 15프로를 넘어서면 replica 를 10개까지 늘려준다:
 
-- 결제서비스에 대한 replica 를 동적으로 늘려주도록 HPA 를 설정한다. 설정은 CPU 사용량이 15프로를 넘어서면 replica 를 10개까지 늘려준다:
 ```
-kubectl autoscale deploy payment --min=1 --max=10 --cpu-percent=15
+kubectl autoscale deploy delivery --min=1 --max=10 --cpu-percent=15
 ```
-![image](https://user-images.githubusercontent.com/69283674/97295328-7b6d8900-1892-11eb-9581-f40d9b09b5de.png)
+  -> 여기에 replica 확장 이미지 
 
 
-- 결제서비스의 deployment.yaml의 spec에 아래와 같이 자원속성을 설정한다:
+- 배송서비스의 deployment.yaml의 spec에 아래와 같이 자원속성을 설정한다:
 
 ![image](https://user-images.githubusercontent.com/69283674/97291666-8f62bc00-188d-11eb-9594-c14a11328bb0.png)
 
