@@ -657,6 +657,7 @@ hystrix:
 ```
 부하테스터 siege 툴을 통한 서킷 브레이커 동작 확인:
 - 동시사용자 1명, 20초 동안 실시
+
  -> 여기에 이미지
 
 운영시스템은 죽지 않고 지속적으로 CB 에 의하여 적절히 회로가 열림과 닫힘이 벌어지면서 자원을 보호하고 있음을 보여줌. 하지만, 50%의 비율로 성공과 실패를 반복하여 신뢰성 있는 시스템으로 판단하기 어렵기 때문에 Retry 설정과 동적 Scale out (replica의 자동적 추가,HPA) 을 통하여 시스템을 확장 해주는 후속처리가 필요할 것으로 판단하였다.
@@ -674,37 +675,59 @@ kubectl autoscale deploy delivery --min=1 --max=10 --cpu-percent=15
 ```
   -> 여기에 replica 확장 이미지 
 
-
-- 배송서비스의 deployment.yaml의 spec에 아래와 같이 자원속성을 설정한다:
-
-![image](https://user-images.githubusercontent.com/69283674/97291666-8f62bc00-188d-11eb-9594-c14a11328bb0.png)
-
-- CB 에서 했던 방식대로 워크로드를 1분 동안 걸어준다.
 ```
-siege -c100 -t60S -content-type "application/json" 'http://payment:8080/payments'
+Auto Scale-Out 
+kubectl apply -f https://k8s.io/examples/application/php-apache.yaml
+NOTE : 서비스가 Auto Scaling되기 위해서는 컨테이너 Spec에 Resources : 설정이 있어야 함
+          resources:
+            limits:
+              cpu: 500m
+            requests:
+              cpu: 200m  
+(오토 스케일링 설정, hpa: HorizontalPodAutoscaler )
+kubectl autoscale deployment php-apache --cpu-percent=20 --min=1 --max=10
+cpu-percent=50 : Pod 들의 요청 대비 평균 CPU 사용율 (여기서는  요청이 200 milli-cores이므로, 모든 Pod의 평균 CPU 사용율이 100 milli-cores(50%)를 넘게되면 HPA 발생)
+```
+
+
+- 워크로드를 걸어준다.
+```
+siege -c100 -t60S  --content-type "application/json" 'http://reservation:8080/reservations POST {"reserveStatus":"reserve","roomNumber":1,"paymentPrice":50000,"deliveryStatus":"DeliveryRequested"}'
 
 ```
 - 오토스케일이 어떻게 되고 있는지 모니터링을 걸어둔다:
 ```
-kubectl get deploy payment -w
+kubectl get deploy delivery -w
 ```
 
-- siege 의 로그를 보아도 전체적인 성공률이 높아진 것을 확인 할 수 있다. 
+- 어느정도 시간이 흐른 후 스케일 아웃이 벌어지는 것을 확인할 수 있다:
 
-![image](https://user-images.githubusercontent.com/69283674/97295982-5fb6b280-1893-11eb-89ef-741b220b2201.png)
+  -> deploy scale-out 이미지
+
 
 
 ### 무정지 재배포
 
-- 먼저 무정지 재배포가 100% 되는 것인지 확인하기 위해서 Autoscaler 이나 CB 설정을 제거함
+- 먼저 무정지 재배포가 100% 되는 것인지 확인하기 위해서 Autoscaler과 CB 설정을 제거함
 - seige 로 배포작업 직전에 워크로드를 모니터링 함.
-![image](https://user-images.githubusercontent.com/69283674/97297532-837af800-1895-11eb-868d-f7c70ab6b3c6.png)
-
+```
+siege -c100 -t60S  --content-type "application/json" 'http://reservation:8080/reservations POST {"reserveStatus":"reserve","roomNumber":1,"paymentPrice":50000,"deliveryStatus":"DeliveryRequested"}'
+```
 
 - 새버전으로의 배포 시작
+```
+kubectl set image ...
+
+(Product 서비스) 
+코드 수정시, Update(이미지 재적용) 하기  
+kubectl set image deploy product product=283210891307.dkr.ecr.ap-northeast-2.amazonaws.com/product:v2 로  컨테이너 이미지 Update
+
+
+```
 
 - seige 의 화면으로 넘어가서 Availability 가 100% 미만으로 떨어졌는지 확인
 ```
+ -> Update 이미지... 
 Transactions:		        2962 hits
 Availability:		       80.45 %
 Elapsed time:		       29.99 secs
@@ -715,9 +738,46 @@ Throughput:		        0.02 MB/sec
 Concurrency:		       1.46
 ```
 
+배포기간중 Availability 가 평소 100%에서 60% 대로 떨어지는 것을 확인. 원인은 쿠버네티스가 성급하게 새로 올려진 서비스를 READY 상태로 인식하여 서비스 유입을 진행한 것이기 때문. 이를 막기위해 Readiness Probe 를 설정하였다.
+
+```
+# deployment.yaml 의 readiness probe 의 설정:
+
+
+kubectl apply -f kubernetes/deployment.yaml
+```
+
 
 - 동일한 시나리오로 재배포 한 후 Availability 확인:
 
+  -> 이미지 현행화... 
 ![image](https://user-images.githubusercontent.com/69283674/97297629-a1e0f380-1895-11eb-89f3-acc70aa3a30c.png)
 
 배포기간 동안 Availability 가 변화없기 때문에 무정지 재배포가 성공한 것으로 확인됨.
+
+
+## Livness구현
+
+Delivery의 depolyment.yml 소스설정
+ - http get방식에서 tcp방식으로 변경, 서비스포트 8080이 아닌 8081로 포트 변경하였다.,
+ 
+ - describe 확인
+ 
+ - 원복 후, 정상 확인
+
+
+
+
+## Configmap
+컨테이너 이미지로부터 설정 정보를 분리하기 위한 ConfigMaps을 적용/확인하였다.
+- 환경변수나 설정값 들을 환경변수로 관리해 Pod가 생성될 때 이 값을 주입한다.
+
+
+
+
+
+
+onfigmap.yaml 파일설정
+
+
+
