@@ -740,7 +740,8 @@ hystrix:
 부하테스터 siege 툴을 통한 서킷 브레이커 동작 확인:
 - 동시사용자 1명, 20초 동안 실시
 
- -> 여기에 이미지
+![image](https://user-images.githubusercontent.com/68646938/97492160-844f7f00-19a6-11eb-8a50-44c450f335a3.PNG)
+![image](https://user-images.githubusercontent.com/68646938/97492191-8dd8e700-19a6-11eb-8947-56d6a4682d84.PNG)
 
 운영시스템은 죽지 않고 지속적으로 CB 에 의하여 적절히 회로가 열림과 닫힘이 벌어지면서 자원을 보호하고 있음을 보여줌. 하지만, 50%의 비율로 성공과 실패를 반복하여 신뢰성 있는 시스템으로 판단하기 어렵기 때문에 Retry 설정과 동적 Scale out (replica의 자동적 추가,HPA) 을 통하여 시스템을 확장 해주는 후속처리가 필요할 것으로 판단하였다.
 
