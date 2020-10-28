@@ -238,7 +238,6 @@ https://www.msaez.io/#/storming/vK3Ti7jb85Q5GVnPwKO5ecQpjRJ2/every/a1a546e3387be
 
 
 
-
 # 구현:
 
 요구사항의 추가에 따라 신규 서버스(마이크로 서비스)를 추가하고, 스프링부트로 구현하였다. 
@@ -355,167 +354,161 @@ public interface ReservationRepository extends PagingAndSortingRepository<Reserv
 }
 ```
 - 적용 후 REST API 의 테스트
+
 ```
+#  Reservation 서비스의 예약 주문
+http post http://reservation:8080/reservations customerName="kosmocor" customerId=12345 reserveStatus="reserve" roomNumber=1 paymentPrice=50000 deliveryStatus="DeliveryRequested"
+```
+--> 예약주문 이미지
 
-
-#  Room 서비스의 객실정보처리
-http post http://room:8080/rooms roomType="SWEET" roomStatus="EMPTY" roomName="SweetRoom" roomQty=10 roomPrice=60000
-
-#  Reservation 서비스의 예약처리
-http post http://reservation:8080/reservations customerId=9805 customerName="PARK" roomNumber=1 reserveStatus="reserve" paymentPrice=50000
-
+```
 # 예약 상태 확인
-http http://roomInfo:8080/roomInfoes
+http http://reservation:8080/reservations
+```
+--> 예약상태 이미지
 
 ```
+# 프로모션 상품 배송 요청 확인
+http http://delivery:8080/deliveries
+```
+--> 배송요청 이미지
+
 
 
 
 ## 동기식 호출 
 
-분석단계에서의 조건 중 하나로 예약(Reservation)->결제(Payment) 간의 호출은 동기식 일관성을 유지하는 트랜잭션으로 처리하기로 하였다. 호출 프로토콜은 이미 앞서 Rest Repository 에 의해 노출되어있는 REST 서비스를 FeignClient 를 이용하여 호출하도록 한다. 
+추가된 요구사항으로 예약(Reservation)->배송(Delivery) 간의 호출은 동기식 일관성을 유지하는 트랜잭션으로 처리하기로 하였다. 호출 프로토콜은 이미 앞서 Rest Repository 에 의해 노출되어있는 REST 서비스를 FeignClient 를 이용하여 호출하도록 한다. 
 
-- 결제서비스를 호출하기 위하여 Stub과 (FeignClient) 를 이용하여 Service 대행 인터페이스 (Proxy) 를 구현 
-
+- 결제서비스를 호출하기 위하여 FeignClient 를 이용하여 Service 대행 인터페이스 (Proxy) 를 구현 
 ```
-# (payment) PaymentManagementService.java
+# (delivery) DeliveryService.java
+
 package accommodation.external;
 
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.*;
-
+...
 @org.springframework.stereotype.Service
-@FeignClient(name="reservationNumber", url="${api.url.payment}")
-public interface PaymentManagementService {
+@FeignClient(name="deliveryNumber", url="${api.url.delivery}")
+public interface DeliveryService {
 
-    @RequestMapping(method= RequestMethod.POST, path="/payments", consumes = "application/json")
-    public void CompletePayment(@RequestBody Payment payment);
-
+    @RequestMapping(method= RequestMethod.POST, path="/deliveries", consumes = "application/json")
+    public void RequestDelivery(@RequestBody Delivery delivery);
 }
 ```
 
-- 결제 요청 시 동기적으로 실행
+- 접수를 받은 직후(@PrePersist) 배송 요청하도록 처리
 ```
-# Reservation.java (Entity)
-
-    @PreUpdate
-    public void onPreUpdate(){
+# (reservation) Reservation.java
+...
+    @PrePersist
+    public void onPrePersist(){
         ...
-            Payment payment = new Payment();
-            payment.setPaymentPrice(getPaymentPrice());
-            payment.setReservationNumber(getReservationNumber());
-            payment.setReservationStatus(getReserveStatus()); 
-            
-            Application.applicationContext.getBean(PaymentManagementService.class).CompletePayment(payment);
-          
+        if ("DeliveryRequested".equals(deliveryStatus) ) {
+            Delivery delivery = new Delivery();
+
+            delivery.setDeliveryStatus(this.getDeliveryStatus());
+            delivery.setReservationNumber(this.getReservationNumber());
+            delivery.setCustomerId(this.getCustomerId());
+            delivery.setCustomerName(this.getCustomerName());
+
+            Application.applicationContext.getBean(DeliveryService.class).RequestDelivery(delivery);
+            ...
+        }
     }
 ```
 
-- 동기식으로 결제 요청시 결제 시스템 장애의 경우 예약 불가 확인 :
+- 동기식 호출에서는 연동된 결제 시스템이 장애가 나면, 커플링되어 객실 예약이 안되는 현상 확인함.
 ```
-#결제요청
+# 배송(delivery) 서비스 down
+
+# 객실(reservation) 예약 실패
 http post http://reservation:8080/reservations reservationNumber=1 reserveStatus="payment" customerName="PARK" customerId=9805 roomNumber=1 paymentPrice=50001
+```
+  -> 객실 예약 실패 이미지
 
 ```
+# 배송(delivery) 서비스 재기동
+cd delivery
+mvn spring-boot:run
 
-
+# 객실(reservation) 예약 성공
 ```
-#객실등록
-http post http://room:8080/rooms roomType="SWEET" roomStatus="EMPTY" roomName="SweetRoom" roomQty=10 roomPrice=60000
+  -> 객실 예약 실패 이미지
 
-#예약요청 (객실이 있을경우)
-http post http://reservation:8080/reservations customerName="PARK" customerId=9805 reserveStatus="reserve" roomNumber=1 paymentPrice=60000
-
-#결제요청
-http post http://reservation:8080/reservations reservationNumber=1 reserveStatus="payment" customerName="PARK" customerId=9805 roomNumber=1 paymentPrice=60000
-
-#Check Out
-http post http://reservation:8080/reservations reservationNumber=5 reserveStatus="checkOut" customerName="PARK" customerId=9805 roomNumber=1 paymentPrice=60000
-```
 
 
 ## 비동기식 호출 / 시간적 디커플링 / 장애격리 / 최종 (Eventual) 일관성 테스트
 
-
-결제 이후 이를 예약 정보 변경은 비동기로 호출하여 개별적으로 조회 가능하도록 구현
- 
-- 이를 위하여 결제이력에 기록을 남긴 후에 곧바로 결제승인이 되었다는 도메인 이벤트를 카프카로 송출한다(Publish)
- 
+예약주문/배송요청 이후 배송완료의 처리는 동기식이 아니라 비 동기식으로 처리하여, 배송 시스템의 일시 중단이 예약/결재/배송완료의 처리가 블로킹 되지 않도록 적용하였다.
+- 이를 위해 예약 정보의 수정 이후 곧바로 배송 완료 되었다는 도메인 이벤트를 카프카로 송출한다(Publish)
 ```
-package accommodation;
-
-@Entity
-@Table(name="Reservation_table")
-public class Reservation  {
-
- ...
-    @PrePersist
-    public void onPrePersist(){
-        setReserveStatus("reserve");
-        Reserved reserved = new Reserved();
-        reserved.setReservationNumber(this.getReservationNumber());
-        reserved.setReserveStatus(this.getReserveStatus());
-        reserved.setCustomerName(this.getCustomerName());
-        reserved.setCustomerId(this.getCustomerId());
-        reserved.setRoomNumber(this.getRoomNumber());
-        reserved.setPaymentPrice(this.getPaymentPrice());
-
-        reserved.publishAfterCommit();
-    }    
-```
-- 예약 서비스에서 해당 비동기 호출을 수신할 PolicyHandler를 구현
-
-```
-package hotelmanage;
-
+# (reservation) Reservation.java
 ...
+    @PreUpdate
+    public void onPreUpdate(){
+        ....
+        if ("DeliveryCompleted".equals(deliveryStatus) ) {
+            DeliveryCompleted deliveryCompleted = new DeliveryCompleted();
 
-@Service
-public class PolicyHandler{
+            deliveryCompleted.setDeliveryStatus(deliveryStatus);
+            deliveryCompleted.setReservationNumber(reservationNumber);
+            deliveryCompleted.setCustomerId(customerId);
+            deliveryCompleted.setCustomerName(customerName);
 
-    @Autowired
-    ReservationRepository reservationManagementrepository;
-    
-    @StreamListener(KafkaProcessor.INPUT)
-    public void wheneverPaymentCompleted_ChangeResvStatus(@Payload PaymentCompleted paymentcompleted){
-        System.out.println(paymentcompleted.toJson());
-        if(paymentcompleted.isMe()){
-            System.out.println("====================================결제완료 1차====================================");
-            if(reservationManagementrepository.findById(paymentcompleted.getReservationNumber()) != null){
-                System.out.println("====================================결제완료====================================");
-                Reservation reservationManagement = reservationManagementrepository.findById(paymentcompleted.getReservationNumber()).get();
-                reservationManagement.setReserveStatus("paymentComp");
-                reservationManagementrepository.save(reservationManagement);
+            ObjectMapper objectMapper = new ObjectMapper();
+            String json = null;
+
+            try {
+                json = objectMapper.writeValueAsString(deliveryCompleted);
+            } catch (JsonProcessingException e) {
+                throw new RuntimeException("JSON format exception", e);
             }
+
+            KafkaProcessor processor = Application.applicationContext.getBean(KafkaProcessor.class);
+            MessageChannel outputChannel = processor.outboundTopic();
+
+            outputChannel.send(MessageBuilder
+                    .withPayload(json)
+                    .setHeader(MessageHeaders.CONTENT_TYPE, MimeTypeUtils.APPLICATION_JSON)
+                    .build());
+            System.out.println(deliveryCompleted.toJson());
+            deliveryCompleted.publishAfterCommit();
         }
+        ...
     }
 
+```
+
+배송(Delivery) 시스템에서는 배송완료 이벤트에 대해서 이를 수신하여 자신의 정책을 처리하도록 PolicyHandler 를 구현하였다.
+ 
+```
+@Service
+public class PolicyHandler {
+    @Autowired
+    DeliveryRepository deliveryRepository;
+
+    @StreamListener(KafkaProcessor.INPUT)
+    public void wheneverDeliveryCompleted(@Payload DeliveryCompleted deliveryCompleted){
+        // 배송 완료시, 배송상태 Update
+        if(deliveryCompleted.isMe()){
+            Delivery delivery = new Delivery();
+            delivery.setDeliveryStatus(deliveryCompleted.getDeliveryStatus());
+            delivery.setReservationNumber(deliveryCompleted.getReservationNumber());
+            delivery.setDeliveryStatus(deliveryCompleted.getDeliveryStatus());
+            delivery.setCustomerId(deliveryCompleted.getCustomerId());
+            delivery.setCustomerName(deliveryCompleted.getCustomerName());
+            delivery.setCustomerAddress(deliveryCompleted.getCustomerAddress());
+            delivery.setCustomerContract(deliveryCompleted.getCustomerContract());
+
+            deliveryRepository.save(delivery);
+        }
+    }
 }
-
 ```
 
-객실 시스템은 예약/결제와 완전히 분리되어있으며, 이벤트 수신에 따라 처리되기 때문에, 객실시스템이 유지보수로 인해 잠시 내려간 상태라도 예약을 받는데 문제가 없다:
-```
-# 객실 서비스 (room) 를 잠시 내려놓음 (ctrl+c)
-kubectl scale deploy room --replicas=0
 
-#예약 및 결제처리
-http post http://reservation:8080/reservations customerName="PARK" customerId=9805 reserveStatus="reserve" roomNumber=1 paymentPrice=50000
-   #Success
-http post http://reservation:8080/reservations reservationNumber=1 reserveStatus="payment" customerName="PARK" customerId=9805 roomNumber=101 paymentPrice=50001
-   #Success
-
-#객실상태 확인
-http http://roomInfo:8080/roomInfoes     # 객실 상태 안바뀜 확인
-
-#객실 서비스 기동
---cd RoomManagement
---mvn spring-boot:run
-kubectl scale deploy room --replicas=1
-
-#객실상태 확인
-http localhost:8084/roomInfos     # 객실의 상태가 "Notavailable"으로 확인
-```
 
 ## CQRS 패턴 
 사용자 View를 위한 객실 정보 조회 서비스를 위한 별도의 객실 정보 저장소를 구현
@@ -560,7 +553,10 @@ public class Room {
         System.out.println("예약가능으로 변경");
     }
 ```
-- RoomInfo에 저장하는 서비스 정책 (PolicyHandler)구현
+
+사용자 View를 위한 객실 정보 조회 서비스를 위한 별도의 객실 정보 저장소를 구현
+- 이를 하여 RoomInfo 서비스를 별도로 구축하고 저장 이력을 기록한다.
+- 모든 정보는 비동기 방식으로 호출한다.
 ```
 PolicyHandler.java
 
@@ -591,10 +587,15 @@ public class PolicyHandler{
 ```
 
 # API 게이트웨이
-Clous 환경에서는 //서비스명:8080 에서 Gateway API가 작동해야함 application.yml 파일에 profile별 gateway 설정
--  Gateway 설정 파일 
 
-![image](https://user-images.githubusercontent.com/69283674/97270866-279f7780-1873-11eb-958f-90ed7d0eec47.png)
+```
+Clous 환경에서는 //서비스명:8080 에서 Gateway API가 작동해야하므로, application.yml 파일에 profile별 gateway 설정을 적용하였다.,
+-  Gateway 설정 파일 
+```
+
+-> delivery 추가된 이미지 파일
+
+
 
 
 # 운영
@@ -612,41 +613,56 @@ Clous 환경에서는 //서비스명:8080 에서 Gateway API가 작동해야함 
 ![image](https://user-images.githubusercontent.com/69283674/97273520-d6918280-1876-11eb-8530-1447d2000735.png)
 
 
+
 ## 동기식 호출 / 서킷 브레이킹 / 장애격리
 
 * 서킷 브레이킹 프레임워크의 선택: Spring FeignClient + Hystrix 옵션을 사용하여 구현함
 
-시나리오는 예약(Reservation)-->결제(Payment) 시의 연결을 RESTful Request/Response 로 연동하여 구현이 되어있고, 결제 요청이 과도할 경우 CB 를 통하여 장애격리.
-
-- Hystrix 를 설정:  요청처리 쓰레드에서 처리시간이 610 밀리가 넘어서기 시작하여 어느정도 유지되면 CB 회로가 닫히도록 (요청을 빠르게 실패처리, 차단) 설정
+시나리오는 예약(Reservation)-->배송(DElivery) 시의 연결을 RESTful Request/Response 로 연동하여 구현 되어있고, 배송 요청이 과도할 경우 CB를 통하여 장애격리 한다.
+- Hystrix 를 설정:  요청처리 쓰레드에서 처리시간이 600 밀리가 넘어서기 시작하여 어느정도 유지되면 CB 회로가 닫히도록 (요청을 빠르게 실패처리, 차단) 설정
 ```
 # application.yml
+
+feign:
+  hystrix:
+    enabled: true
 
 hystrix:
   command:
     # 전역설정
     default:
-      execution.isolation.thread.timeoutInMilliseconds: 610
+      execution.isolation.thread.timeoutInMilliseconds: 600
 
 ```
 
-- 피호출 서비스(결제:PaymentManagement) 의 임의 부하 처리 - 400 밀리에서 증감 220 밀리 정도 왔다갔다 하게
+피호출 서비스(배송:Delivery) 의 임의 부하 처리 - 400 밀리 추가하여 0~300 밀리 정도의 지연이 발생하도록 적용
 ```
-# (PaymentManagement) Payment.java (Entity)
+# (Delivery) Delivery.java (Entity)
 
     @PrePersist
     public void onPrePersist(){  //결제이력을 저장한 후 적당한 시간 끌기
 
         ...
         
-        try {
-                Thread.currentThread().sleep((long) (400 + Math.random() * 220));
-                System.out.println("=============결재 승인 완료=============");
+            long delayed = (long) (400 + Math.random() * 300);
+            try {
+                Thread.currentThread().sleep((long) delayed);
+                System.out.println("======= finally delayed : " + delayed);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
+        ....
     }
+
 ```
+부하테스터 siege 툴을 통한 서킷 브레이커 동작 확인:
+- 동시사용자 1명, 10초 동안 실시
+ -> 여기에 이미지
+
+운영시스템은 죽지 않고 지속적으로 CB 에 의하여 적절히 회로가 열림과 닫힘이 벌어지면서 자원을 보호하고 있음을 보여줌. 하지만, 81.82% 가 성공하였고, 18.18%가 실패했다는 것은 고객 사용성에 있어 좋지 않기 때문에 Retry 설정과 동적 Scale out (replica의 자동적 추가,HPA) 을 통하여 시스템을 확장 해주는 후속처리가 필요.
+
+Availability 가 높아진 것을 확인 (siege)
+
 
 
 ### 오토스케일 아웃
