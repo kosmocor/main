@@ -588,13 +588,95 @@ public class PolicyHandler{
 
 # API 게이트웨이
 
-```
-Clous 환경에서는 //서비스명:8080 에서 Gateway API가 작동해야하므로, application.yml 파일에 profile별 gateway 설정을 적용하였다.,
+Clous 환경에서는 //서비스명:8080 에서 Gateway API가 작동해야하므로, application.yml 파일에 profile별 gateway 설정을 적용하였다.
 -  Gateway 설정 파일 
+
 ```
+(gateway) application.yml
+spring:
+  profiles: default
+  cloud:
+    gateway:
+      routes:
+        - id: reservation
+          uri: http://localhost:8081
+          predicates:
+            - Path=/reservations/**
+        - id: payments
+          uri: http://localhost:8082
+          predicates:
+            - Path=/payments/**
+        - id: rooms
+          uri: http://localhost:8083
+          predicates:
+            - Path=/rooms/**
+        - id: notices
+          uri: http://localhost:8084
+          predicates:
+            - Path=/notices/**
+        - id: roomInfoes
+          uri: http://localhost:8085
+          predicates:
+            - Path=/roomInfoes/**
+        - id: deliveries
+          uri: http://localhost:8089
+          predicates:
+            - Path=/deliveries/**
+      globalcors:
+        corsConfigurations:
+          '[/**]':
+            allowedOrigins:
+              - "*"
+            allowedMethods:
+              - "*"
+            allowedHeaders:
+              - "*"
+            allowCredentials: true
+---
 
--> delivery 추가된 이미지 파일
+spring:
+  profiles: docker
+  cloud:
+    gateway:
+      routes:
+        - id: reservation
+          uri: http://reservation:8080
+          predicates:
+            - Path=/reservations/**
+        - id: payments
+          uri: http://payments:8080
+          predicates:
+            - Path=/payments/**
+        - id: rooms
+          uri: http://room:8080
+          predicates:
+            - Path=/rooms/**
+        - id: notices
+          uri: http://notices:8080
+          predicates:
+            - Path=/notices/**
+        - id: roomInfoes
+          uri: http://roomInfo:8080
+          predicates:
+            - Path=/roomInfoes/**
+        - id: deliveries
+          uri: http://delivery:8080
+          predicates:
+            - Path=/deliveries/**
+      globalcors:
+        corsConfigurations:
+          '[/**]':
+            allowedOrigins:
+              - "*"
+            allowedMethods:
+              - "*"
+            allowedHeaders:
+              - "*"
+            allowCredentials: true
 
+server:
+  port: 8080
+```
 
 
 
