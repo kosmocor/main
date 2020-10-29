@@ -904,15 +904,7 @@ Delivery의 depolyment.yml 소스설정
 
 
 ## Configmap
-컨테이너 이미지로부터 설정 정보를 분리하기 위한 ConfigMaps을 적용/확인하였다.
-- 환경변수나 설정값 들을 환경변수로 관리해 Pod가 생성될 때 이 값을 주입한다.
-
-
-
-
-
-
-onfigmap.yaml 파일설정
-
+컨테이너 이미지로부터 설정 정보를 분리하기 위한 ConfigMaps을 적용 한다.
+(현재 미적용)
 
 
