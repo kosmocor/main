@@ -877,8 +877,6 @@ siege -c100 -t150S  --content-type "application/json" 'http://delivery:8080/deli
 kubectl apply -f kubectl apply -f deployment_non.yml
 ```
 
-
-
 - seige 의 화면으로 넘어가서 Availability 가 100% 미만으로 떨어졌는지 확인
 ![image](https://user-images.githubusercontent.com/68646938/97534620-a88a7a80-19fd-11eb-813b-da009f49425c.PNG)
 
