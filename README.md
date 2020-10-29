@@ -756,36 +756,21 @@ hystrix:
 ```
 kubectl autoscale deploy delivery --min=1 --max=10 --cpu-percent=15
 ```
-  -> 여기에 replica 확장 이미지 
-
-```
-Auto Scale-Out 
-kubectl apply -f https://k8s.io/examples/application/php-apache.yaml
-NOTE : 서비스가 Auto Scaling되기 위해서는 컨테이너 Spec에 Resources : 설정이 있어야 함
-          resources:
-            limits:
-              cpu: 500m
-            requests:
-              cpu: 200m  
-(오토 스케일링 설정, hpa: HorizontalPodAutoscaler )
-kubectl autoscale deployment php-apache --cpu-percent=20 --min=1 --max=10
-cpu-percent=50 : Pod 들의 요청 대비 평균 CPU 사용율 (여기서는  요청이 200 milli-cores이므로, 모든 Pod의 평균 CPU 사용율이 100 milli-cores(50%)를 넘게되면 HPA 발생)
-```
-
+![image](https://user-images.githubusercontent.com/68646938/97516602-cb556880-19d6-11eb-96a5-978c2519e0b7.PNG)
 
 - 워크로드를 걸어준다.
 ```
-siege -c100 -t60S  --content-type "application/json" 'http://reservation:8080/reservations POST {"reserveStatus":"reserve","roomNumber":1,"paymentPrice":50000,"deliveryStatus":"DeliveryRequested"}'
-
+siege -c200 -t120S   --content-type "application/json" 'http://delivery:8080/deliveries POST  {"reserveStatus":"reserve","reservationNumber":1,"deliveryStatus":"DeliveryCompleted"}'
 ```
-- 오토스케일이 어떻게 되고 있는지 모니터링을 걸어둔다:
+![image](https://user-images.githubusercontent.com/68646938/97516567-b8db2f00-19d6-11eb-81e3-30b181e016d4.PNG)
+
+- 오토스케일이 어떻게 되고 있는지 모니터링을 걸어둔다
+- 어느정도 시간이 흐른 후 스케일 아웃이 벌어지는 것을 확인할 수 있다
 ```
 kubectl get deploy delivery -w
 ```
+![image](https://user-images.githubusercontent.com/68646938/97516605-cbedff00-19d6-11eb-8e1f-dfda900db9f2.PNG)
 
-- 어느정도 시간이 흐른 후 스케일 아웃이 벌어지는 것을 확인할 수 있다:
-
-  -> deploy scale-out 이미지
 
 
 
