@@ -833,6 +833,11 @@ hystrix:
 - 배송서비스에 대한 replica 를 동적으로 늘려주도록 HPA 를 설정한다. 설정은 CPU 사용량이 15프로를 넘어서면 replica 를 10개까지 늘려준다:
 
 ```
+deplyment.yml 설정
+```
+![image](https://user-images.githubusercontent.com/68646938/97529320-ff3e8700-19f2-11eb-97f2-d9366d5a651a.PNG)
+
+```
 kubectl autoscale deploy delivery --min=1 --max=10 --cpu-percent=15
 ```
 ![image](https://user-images.githubusercontent.com/68646938/97529110-90612e00-19f2-11eb-8072-d63a58d0d90a.PNG)
