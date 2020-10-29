@@ -776,50 +776,30 @@ kubectl get deploy delivery -w
 
 ### 무정지 재배포
 
-- 먼저 무정지 재배포가 100% 되는 것인지 확인하기 위해서 Autoscaler과 CB 설정을 제거함
+- 먼저 무정지 재배포가 100% 되는 것인지 확인하기 위해서 Autoscale과 CB 설정을 제거하였으며,
 - seige 로 배포작업 직전에 워크로드를 모니터링 함.
 ```
-siege -c100 -t60S  --content-type "application/json" 'http://reservation:8080/reservations POST {"reserveStatus":"reserve","roomNumber":1,"paymentPrice":50000,"deliveryStatus":"DeliveryRequested"}'
+siege -c100 -t150S  --content-type "application/json" 'http://delivery:8080/deliveries POST  {"reserveStatus":"reserve","reservationNumber":1,"deliveryStatus":"DeliveryCompleted"}'
 ```
 
 - 새버전으로의 배포 시작
 ```
-kubectl set image ...
-
-(Product 서비스) 
-코드 수정시, Update(이미지 재적용) 하기  
-kubectl set image deploy product product=283210891307.dkr.ecr.ap-northeast-2.amazonaws.com/product:v2 로  컨테이너 이미지 Update
-
-
+kubectl set image deploy delivery delivery=team421acr.azurecr.io/delivery:latest
 ```
 
 - seige 의 화면으로 넘어가서 Availability 가 100% 미만으로 떨어졌는지 확인
-```
- -> Update 이미지... 
-Transactions:		        2962 hits
-Availability:		       80.45 %
-Elapsed time:		       29.99 secs
-Data transferred:	        0.75 MB
-Response time:		        0.01 secs
-Transaction rate:	       98.77 trans/sec
-Throughput:		        0.02 MB/sec
-Concurrency:		       1.46
-```
+![image](https://user-images.githubusercontent.com/68646938/97518700-20937900-19db-11eb-82e8-02db3f469919.PNG)
 
-배포기간중 Availability 가 평소 100%에서 60% 대로 떨어지는 것을 확인. 원인은 쿠버네티스가 성급하게 새로 올려진 서비스를 READY 상태로 인식하여 서비스 유입을 진행한 것이기 때문. 이를 막기위해 Readiness Probe 를 설정하였다.
+배포기간중 Availability 가 평소 100%에서 95% 대로 떨어지는 것을 확인. 원인은 쿠버네티스가 성급하게 새로 올려진 서비스를 READY 상태로 인식하여 서비스 유입을 진행한 것이기 때문. 이를 막기위해 Readiness Probe 를 설정하였다.
 
 ```
-# deployment.yaml 의 readiness probe 의 설정:
-
-
-kubectl apply -f kubernetes/deployment.yaml
-```
-
+# deployment.yaml 의 readiness probe 의 설정
+``` 
+![image](https://user-images.githubusercontent.com/68646938/97518854-723c0380-19db-11eb-9db9-a8464d747a7f.PNG)
 
 - 동일한 시나리오로 재배포 한 후 Availability 확인:
 
-  -> 이미지 현행화... 
-![image](https://user-images.githubusercontent.com/69283674/97297629-a1e0f380-1895-11eb-89f3-acc70aa3a30c.png)
+![image](https://user-images.githubusercontent.com/68646938/97520325-4b330100-19de-11eb-883c-b4e895f8c0fb.PNG)
 
 배포기간 동안 Availability 가 변화없기 때문에 무정지 재배포가 성공한 것으로 확인됨.
 
