@@ -835,20 +835,20 @@ hystrix:
 ```
 kubectl autoscale deploy delivery --min=1 --max=10 --cpu-percent=15
 ```
-![image](https://user-images.githubusercontent.com/68646938/97516602-cb556880-19d6-11eb-96a5-978c2519e0b7.PNG)
+![image](https://user-images.githubusercontent.com/68646938/97529110-90612e00-19f2-11eb-8072-d63a58d0d90a.PNG)
 
 - 워크로드를 걸어준다.
 ```
-siege -c200 -t120S   --content-type "application/json" 'http://delivery:8080/deliveries POST  {"reserveStatus":"reserve","reservationNumber":1,"deliveryStatus":"DeliveryCompleted"}'
+siege -c100 -t120S   --content-type "application/json" 'http://delivery:8080/deliveries POST  {"reserveStatus":"reserve","reservationNumber":1,"deliveryStatus":"DeliveryCompleted"}'
 ```
-![image](https://user-images.githubusercontent.com/68646938/97516567-b8db2f00-19d6-11eb-81e3-30b181e016d4.PNG)
+![image](https://user-images.githubusercontent.com/68646938/97529116-91925b00-19f2-11eb-9462-3bd1468a5bcd.PNG)
 
 - 오토스케일이 어떻게 되고 있는지 모니터링을 걸어둔다
 - 어느정도 시간이 흐른 후 스케일 아웃이 벌어지는 것을 확인할 수 있다
 ```
 kubectl get deploy delivery -w
 ```
-![image](https://user-images.githubusercontent.com/68646938/97516605-cbedff00-19d6-11eb-8e1f-dfda900db9f2.PNG)
+![image](https://user-images.githubusercontent.com/68646938/97529115-90f9c480-19f2-11eb-83b6-e4ac4ccd03eb.PNG)
 
 
 
