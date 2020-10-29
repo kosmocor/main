@@ -508,12 +508,64 @@ public class PolicyHandler {
 }
 ```
 
+## 폴리글랏
+
+신규 구성된 배송(devlivery)시스템의 데이터베이스에 폴리글랏을 적용 하였다.
+ -기존 서비스 : H2 DB
+ -신규 서비스 : HyperSQL(SQL)
+
+![image](https://user-images.githubusercontent.com/68646938/97523393-871d9480-19e5-11eb-802c-aa32aca9189d.PNG)
 
 
 ## CQRS 패턴 
 사용자 View를 위한 객실 정보 조회 서비스를 위한 별도의 객실 정보 저장소를 구현
 - 이를 하여 RoomInfo 서비스를 별도로 구축하고 저장 이력을 기록한다.
 - 모든 정보는 비동기 방식으로 호출한다.
+
+
+```
+(신규, Reservation 에서 배송요청 이벤트 송신)reservation.java
+
+    @PreUpdate
+    public void onPreUpdate(){
+
+        // 배송 요청 추가 DeliveryCompleted -> 이벤트 메시지 발송..
+        if ("DeliveryCompleted".equals(deliveryStatus) ) {
+            System.out.println("=============배송 완료 진행=============");
+            System.out.println("====== 2 : deliveryStatus    = " + this.getDeliveryStatus());
+            System.out.println("====== 3 : reservationNumber = " + this.getReservationNumber());
+            System.out.println("====== 4 : customerId        = " + this.getCustomerId());
+            System.out.println("====== 5 : customerName      = " + this.getCustomerName());
+
+            DeliveryCompleted deliveryCompleted = new DeliveryCompleted();
+
+            deliveryCompleted.setDeliveryStatus(deliveryStatus);
+            deliveryCompleted.setReservationNumber(reservationNumber);
+            deliveryCompleted.setCustomerId(customerId);
+            deliveryCompleted.setCustomerName(customerName);
+
+            ObjectMapper objectMapper = new ObjectMapper();
+            String json = null;
+
+            try {
+                json = objectMapper.writeValueAsString(deliveryCompleted);
+            } catch (JsonProcessingException e) {
+                throw new RuntimeException("JSON format exception", e);
+            }
+
+            KafkaProcessor processor = Application.applicationContext.getBean(KafkaProcessor.class);
+            MessageChannel outputChannel = processor.outboundTopic();
+
+            outputChannel.send(MessageBuilder
+                    .withPayload(json)
+                    .setHeader(MessageHeaders.CONTENT_TYPE, MimeTypeUtils.APPLICATION_JSON)
+                    .build());
+            System.out.println(deliveryCompleted.toJson());
+            deliveryCompleted.publishAfterCommit();
+        }
+        ...
+```
+
 
 ```
 Room.java(Entity)
@@ -554,6 +606,7 @@ public class Room {
     }
 ```
 
+
 사용자 View를 위한 객실 정보 조회 서비스를 위한 별도의 객실 정보 저장소를 구현
 - 이를 하여 RoomInfo 서비스를 별도로 구축하고 저장 이력을 기록한다.
 - 모든 정보는 비동기 방식으로 호출한다.
@@ -582,6 +635,30 @@ public class PolicyHandler{
             roomInfoRepository.save(roomInfo);
         }
     }
+
+```
+
+- 배송이 완료된 고객 정보를 비동기 방식으로 수집한다.
+- 이벤트 메시지 수신시, 외부 메시지 발송시스템으로 메시지 발송 의뢰한다.
+
+```
+    @StreamListener(KafkaProcessor.INPUT)
+    public void wheneverSave_DeliveryInfo(@Payload DeliveryCompleted deliveryCompleted){
+        if(deliveryCompleted.isMe()){
+            System.out.println("##### listener 배송정보 수신 : " + deliveryCompleted.toJson());
+            RoomInfo roomInfo = new RoomInfo();
+            roomInfo.setReserveNo(deliveryCompleted.getReservationNumber());
+            roomInfo.setCustomerId(deliveryCompleted.getCustomerId());
+
+            roomInfoRepository.save(roomInfo);
+
+            // external message send
+            System.out.println("##### ");
+            System.out.println("##### external message send (checkout) : " + checkedOut.toJson());
+            System.out.println("##### ");
+        }
+    }
+    
 }
 
 ```
@@ -815,13 +892,11 @@ Delivery의 depolyment.yml 소스설정
  - describe 확인 (kubectl describe deploy delivery)
 ![image](https://user-images.githubusercontent.com/68646938/97521153-4c652d80-19e0-11eb-8b23-acf46176c4c7.PNG)
  
- - 원복 후, 정상 확인
-![image](https://user-images.githubusercontent.com/68646938/97521787-a5819100-19e1-11eb-9128-346c9693ff9a.PNG)
+ - 원복
 ![image](https://user-images.githubusercontent.com/68646938/97521665-62272280-19e1-11eb-8c3e-75a4facbf7e7.PNG)
- 
- 
- 
- 
+
+ - describe 확인 (kubectl describe deploy delivery)
+![image](https://user-images.githubusercontent.com/68646938/97521787-a5819100-19e1-11eb-9128-346c9693ff9a.PNG)
 
 
 
