@@ -807,11 +807,21 @@ kubectl set image deploy delivery delivery=team421acr.azurecr.io/delivery:latest
 ## Livness구현
 
 Delivery의 depolyment.yml 소스설정
- - http get방식에서 tcp방식으로 변경, 서비스포트 8080이 아닌 8081로 포트 변경하였다.,
+ - http get방식에서 tcp방식으로 변경, 서비스포트 8080이 아닌 8081로 포트 변경하였다.
+
+![image](https://user-images.githubusercontent.com/68646938/97520759-46bb1800-19df-11eb-91de-a1d368ba520c.PNG)
+![image](https://user-images.githubusercontent.com/68646938/97521464-f2b13300-19e0-11eb-98f3-7c0b8506e6c8.PNG)
  
- - describe 확인
+ - describe 확인 (kubectl describe deploy delivery)
+![image](https://user-images.githubusercontent.com/68646938/97521153-4c652d80-19e0-11eb-8b23-acf46176c4c7.PNG)
  
  - 원복 후, 정상 확인
+![image](https://user-images.githubusercontent.com/68646938/97521787-a5819100-19e1-11eb-9128-346c9693ff9a.PNG)
+![image](https://user-images.githubusercontent.com/68646938/97521665-62272280-19e1-11eb-8c3e-75a4facbf7e7.PNG)
+ 
+ 
+ 
+ 
 
 
 
