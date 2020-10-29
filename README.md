@@ -234,7 +234,7 @@
 1. (트랜잭션) 프로모션 상품은 회원 약관에 반영되어 있으므로, 예약 주문 접수시 반드시 배송되어야 한다.
 
 ## 이벤트 스토밍
-https://user-images.githubusercontent.com/68646938/97524527-3f4c3c80-19e8-11eb-9712-ab6cdf199f68.PNG
+![image](https://user-images.githubusercontent.com/68646938/97524527-3f4c3c80-19e8-11eb-9712-ab6cdf199f68.PNG)
 
 ## 헥사고날 다이어그램
 
