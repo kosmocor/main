@@ -237,11 +237,7 @@
 ![image](https://user-images.githubusercontent.com/68646938/97524527-3f4c3c80-19e8-11eb-9712-ab6cdf199f68.PNG)
 
 ## 헥사고날 다이어그램
-
-
-
-
-
+![image](https://user-images.githubusercontent.com/68646938/97525465-39575b00-19ea-11eb-9cc2-cc69f334f07b.PNG)
 
 
 # 구현:
